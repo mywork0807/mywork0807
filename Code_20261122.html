@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>我的工作台</title>
+<link rel="manifest" href="./manifest.json">
+<meta name="theme-color" content="#6aa877">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="工作台">
+<style>
+*{box-sizing:border-box;margin:0;padding:0;font-family:system-ui,sans-serif}
+body{background:#eef5ee;color:#222;padding:16px;max-width:720px;margin:0 auto}
+.top-bar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px}
+button{padding:8px 12px;border:none;border-radius:8px;background:#6aa877;color:white;font-size:15px}
+button.secondary{background:#ccc;color:#222}
+.card{background:white;border-radius:12px;padding:14px;margin-bottom:12px;box-shadow:0 2px 6px #00000012}
+.item{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid #eee}
+.item:last-child{border-bottom:none}
+.input-row{display:flex;gap:8px;margin:10px 0}
+input{flex:1;padding:10px;border:1px solid #ddd;border-radius:8px;font-size:16px}
+h2{font-size:18px;margin-bottom:10px}
+</style>
+</head>
+<body>
+<div class="top-bar">
+<button onclick="saveData()">💾保存</button>
+<button onclick="exportJson()">📤备份</button>
+<button onclick="importJson()">📥导入</button>
+</div>
+
+<div class="card">
+<h2>待办清单</h2>
+<div class="input-row">
+<input id="todoInput" placeholder="输入新任务">
+<button onclick="addTodo()">添加</button>
+</div>
+<div id="todoList"></div>
+</div>
+
+<div class="card">
+<h2>笔记</h2>
+<textarea id="noteText" style="width:100%;height:140px;padding:10px;border:1px solid #ddd;border-radius:8px;font-size:16px" placeholder="在这里写笔记"></textarea>
+</div>
+
+<script>
+let data = JSON.parse(localStorage.getItem("workbenchData")) || {todos:[],note:""};
+
+function render(){
+  const list = document.getElementById("todoList");
+  list.innerHTML = "";
+  data.todos.forEach((item,i)=>{
+    const div = document.createElement("div");
+    div.className = "item";
+    div.innerHTML = `
+      <span style="${item.done?'text-decoration:line-through;color:#888':''}">${item.text}</span>
+      <div>
+        <button class="secondary" onclick="toggleTodo(${i})">✓</button>
+        <button class="secondary" onclick="delTodo(${i})">×</button>
+      </div>
+    `
+    list.appendChild(div)
+  })
+  document.getElementById("noteText").value = data.note
+}
+
+function addTodo(){
+  const val = document.getElementById("todoInput").value.trim();
+  if(!val)return
+  data.todos.push({text:val,done:false})
+  document.getElementById("todoInput").value=""
+  saveData()
+  render()
+}
+function toggleTodo(i){
+  data.todos[i].done = !data.todos[i].done
+  saveData()
+  render()
+}
+function delTodo(i){
+  data.todos.splice(i,1)
+  saveData()
+  render()
+}
+function saveData(){
+  data.note = document.getElementById("noteText").value
+  localStorage.setItem("workbenchData",JSON.stringify(data))
+}
+function exportJson(){
+  saveData()
+  const blob = new Blob([JSON.stringify(data,null,2)],{type:"application/json"})
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement("a")
+  a.href=url
+  a.download="workbench-backup.json"
+  a.click()
+  URL.revokeObjectURL(url)
+}
+function importJson(){
+  const ipt = document.createElement("input")
+  ipt.type="file"
+  ipt.accept=".json"
+  ipt.onchange=e=>{
+    const f = e.target.files[0]
+    const r = new FileReader()
+    r.onload=ev=>{
+      data = JSON.parse(ev.target.result)
+      saveData()
+      render()
+    }
+    r.readAsText(f)
+  }
+  ipt.click()
+}
+render()
+</script>
+
+<script>
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", async () => {
+    try {
+      await navigator.serviceWorker.register("./sw.js");
+      console.log("✅ ServiceWorker 已注册");
+    } catch (err) {
+      console.error("注册失败：", err);
+    }
+  });
+}
+let deferredPrompt;
+window.addEventListener("beforeinstallprompt", e => {
+  e.preventDefault();
+  deferredPrompt = e;
+});
+</script>
+</body>
+</html>
